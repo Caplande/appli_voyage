@@ -5,9 +5,9 @@ import pandas as pd
 from fastapi.responses import FileResponse
 
 # Imports de vos fichiers locaux
-import models
-import schemas
-from database import SessionLocal, engine
+from src import models
+from src import schemas
+from src.database import SessionLocal, engine
 
 app = FastAPI(title="Application de Voyage - Gestion des Dépenses")
 
