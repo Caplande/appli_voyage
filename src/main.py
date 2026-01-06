@@ -1,5 +1,8 @@
-from fastapi import FastAPI, Depends, HTTPException
+import io
+
+from fastapi import FastAPI, Depends, HTTPException, Response  # Ajout de Response ici
 from sqlalchemy.orm import Session
+from sqlalchemy import func, text
 from typing import List
 import pandas as pd
 from fastapi.responses import FileResponse
@@ -94,7 +97,7 @@ def calculer_soldes(db: Session = Depends(get_db)):
     for u in utilisateurs:
         # Somme de ce qu'il a payé (Crédit)
         total_paye = (
-            db.query(models.func.sum(models.Depense.montant))
+            db.query(func.sum(models.Depense.montant))
             .filter(models.Depense.payeur_id == u.id)
             .scalar()
             or 0
@@ -102,7 +105,7 @@ def calculer_soldes(db: Session = Depends(get_db)):
 
         # Somme de ce qu'il doit (Débit)
         total_du = (
-            db.query(models.func.sum(models.Repartition.part))
+            db.query(func.sum(models.Repartition.part))
             .filter(models.Repartition.beneficiaire_id == u.id)
             .scalar()
             or 0
@@ -126,23 +129,54 @@ def calculer_soldes(db: Session = Depends(get_db)):
 
 @app.get("/export-excel/")
 def export_excel(db: Session = Depends(get_db)):
-    # Requête SQL pour obtenir le détail complet
-    query = """
-    SELECT 
-        d.date, 
-        d.description as objet, 
-        d.montant as montant_total, 
-        u_payeur.nom as payeur, 
-        r.part as part_individuelle, 
-        u_benef.nom as beneficiaire
-    FROM depenses d
-    JOIN utilisateurs u_payeur ON d.payeur_id = u_payeur.id
-    JOIN repartitions r ON d.id = r.depense_id
-    JOIN utilisateurs u_benef ON r.beneficiaire_id = u_benef.id
-    """
+    try:
+        # On retire d.date car la colonne n'existe pas dans votre table
+        query = text(
+            """
+            SELECT 
+                d.description as objet, 
+                d.montant as montant_total, 
+                u_payeur.nom as payeur, 
+                r.part as part_individuelle, 
+                u_benef.nom as beneficiaire
+            FROM depenses d
+            JOIN utilisateurs u_payeur ON d.payeur_id = u_payeur.id
+            JOIN repartitions r ON d.id = r.depense_id
+            JOIN utilisateurs u_benef ON r.beneficiaire_id = u_benef.id
+        """
+        )
 
-    df = pd.read_sql(query, engine)
-    file_path = "recapitulatif_depenses.xlsx"
-    df.to_excel(file_path, index=False)
+        with engine.connect() as connection:
+            df = pd.read_sql(query, connection)
 
-    return FileResponse(file_path, filename="Justificatif_Voyage.xlsx")
+        # Si le DataFrame est vide, on crée une structure par défaut
+        if df.empty:
+            df = pd.DataFrame(
+                columns=[
+                    "objet",
+                    "montant_total",
+                    "payeur",
+                    "part_individuelle",
+                    "beneficiaire",
+                ]
+            )
+
+        # Création du fichier Excel en mémoire
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Dépenses")
+
+        output.seek(0)
+
+        headers = {
+            "Content-Disposition": 'attachment; filename="Justificatif_Voyage.xlsx"'
+        }
+        return Response(
+            content=output.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers=headers,
+        )
+
+    except Exception as e:
+        print(f"Erreur lors de l'export : {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -6,26 +6,40 @@ from src.database import Base
 class Utilisateur(Base):
     __tablename__ = "utilisateurs"
     id = Column(Integer, primary_key=True, index=True)
-    nom = Column(String, unique=True)
+    nom = Column(String, unique=True, nullable=False)
+
+    # ✅ Relation vers les dépenses qu'il a payées
+    depenses_payees = relationship("Depense", back_populates="payeur")
+
+    # ✅ Relation vers les répartitions dont il est bénéficiaire
+    repartitions = relationship("Repartition", back_populates="beneficiaire")
 
 
 class Depense(Base):
     __tablename__ = "depenses"
-    id = Column(Integer, primary_key=True, index=True)
-    description = Column(String)
-    montant = Column(Float)
-    payeur_id = Column(Integer, ForeignKey("utilisateurs.id"))
+    id = Column(Integer, primary_key=True)
+    description = Column(String, nullable=False)
+    montant = Column(Float, nullable=False)
+    payeur_id = Column(Integer, ForeignKey("utilisateurs.id"), nullable=False)
 
-    payeur = relationship("Utilisateur")
-    repartitions = relationship("Repartition", back_populates="depense")
+    # ✅ Lien vers le payeur
+    payeur = relationship("Utilisateur", back_populates="depenses_payees")
+
+    # ✅ Lien vers les répartitions de cette dépense
+    repartitions = relationship(
+        "Repartition", back_populates="depense", cascade="all, delete-orphan"
+    )
 
 
 class Repartition(Base):
     __tablename__ = "repartitions"
-    id = Column(Integer, primary_key=True, index=True)
-    depense_id = Column(Integer, ForeignKey("depenses.id"))
-    beneficiaire_id = Column(Integer, ForeignKey("utilisateurs.id"))
-    part = Column(Float)
+    id = Column(Integer, primary_key=True)
+    depense_id = Column(Integer, ForeignKey("depenses.id"), nullable=False)
+    beneficiaire_id = Column(Integer, ForeignKey("utilisateurs.id"), nullable=False)
+    part = Column(Float, nullable=False)
 
+    # ✅ Lien vers la dépense
     depense = relationship("Depense", back_populates="repartitions")
-    beneficiaire = relationship("Utilisateur")
+
+    # ✅ Lien vers le bénéficiaire
+    beneficiaire = relationship("Utilisateur", back_populates="repartitions")
