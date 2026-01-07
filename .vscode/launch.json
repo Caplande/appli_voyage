@@ -5,12 +5,42 @@
     "version": "0.0.0",
     "configurations": [
         {
-            "name": "Débogueur Python : initialisation DB",
+            "name": "Débogueur Python : app/main",
             "type": "debugpy",
             "request": "launch",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "program": "src/init_db/initialisation_db.py",
+            "program": "app/main.py",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONIOENCODING": "utf-8"}
+        },{
+            "name": "Débogueur Python : u1",
+            "type": "debugpy",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "program": "app/services/u1.py",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONIOENCODING": "utf-8"}
+        },{
+            "name": "Débogueur Python : Test création",
+            "type": "debugpy",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "program": "app/tests/test_creation.py",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONIOENCODING": "utf-8"}
+        },{
+            "name": "Débogueur Python : Test complet",
+            "type": "debugpy",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "program": "app/tests/test_complet.py",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
                 "PYTHONIOENCODING": "utf-8"}
