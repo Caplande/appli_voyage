@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Application de Voyage</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        fieldset { margin-bottom: 20px; }
+        legend { font-weight: bold; }
+        label { display: block; margin-top: 5px; }
+        input, select { width: 200px; margin-top: 3px; }
+        button { margin-top: 10px; }
+        .result { margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<h1>Application de Voyage</h1>
+
+<!-- Menu permanent -->
+<fieldset>
+    <legend>Menu</legend>
+    <button onclick="showSection('voyageSection')">Créer un voyage</button>
+    <button onclick="showSection('membreSection')">Créer un membre</button>
+    <button onclick="showSection('depenseSection')">Ajouter une dépense</button>
+</fieldset>
+
+<!-- Section Création Voyage -->
+<fieldset id="voyageSection" style="display:none;">
+    <legend>Créer un voyage</legend>
+    <form id="voyageForm">
+        <label for="voyageNom">Nom :</label>
+        <input type="text" id="voyageNom" required>
+
+        <label for="voyageCommentaire">Commentaire :</label>
+        <input type="text" id="voyageCommentaire">
+
+        <label for="voyageDebut">Date de début :</label>
+        <input type="date" id="voyageDebut" required>
+
+        <label for="voyageFin">Date de fin :</label>
+        <input type="date" id="voyageFin" required>
+
+        <button type="submit">Créer</button>
+    </form>
+    <div class="result" id="voyageResult"></div>
+</fieldset>
+
+<!-- Section Création Membre -->
+<fieldset id="membreSection" style="display:none;">
+    <legend>Créer un membre</legend>
+    <form id="membreForm">
+        <label for="membreNom">Nom :</label>
+        <input type="text" id="membreNom" required>
+
+        <label for="membrePrenom">Prénom :</label>
+        <input type="text" id="membrePrenom" required>
+
+        <label for="membreMail">Email :</label>
+        <input type="email" id="membreMail">
+
+        <label for="membreMobile">Numéro mobile :</label>
+        <input type="text" id="membreMobile">
+
+        <label for="voyageSelectMembre">Voyage :</label>
+        <select id="voyageSelectMembre"></select>
+
+        <button type="submit">Créer membre</button>
+    </form>
+    <div class="result" id="membreResult"></div>
+</fieldset>
+
+<!-- Section Ajout Dépense -->
+<fieldset id="depenseSection" style="display:none;">
+    <legend>Ajouter une dépense</legend>
+    <form id="depenseForm">
+        <label for="depenseNom">Description :</label>
+        <input type="text" id="depenseNom" required>
+
+        <label for="depenseMontant">Montant :</label>
+        <input type="number" step="0.01" id="depenseMontant" required>
+
+        <label for="voyageSelectDepense">Voyage :</label>
+        <select id="voyageSelectDepense"></select>
+
+        <button type="submit">Ajouter dépense</button>
+    </form>
+    <div class="result" id="depenseResult"></div>
+</fieldset>
+
+<script>
+// 🔹 Gestion des sections
+function showSection(sectionId) {
+    ['voyageSection','membreSection','depenseSection'].forEach(id => {
+        document.getElementById(id).style.display = (id === sectionId) ? 'block' : 'none';
+    });
+}
+
+// 🔹 Créer un voyage
+document.getElementById("voyageForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nom = document.getElementById("voyageNom").value;
+    const commentaire = document.getElementById("voyageCommentaire").value;
+    const date_debut = document.getElementById("voyageDebut").value;
+    const date_fin = document.getElementById("voyageFin").value;
+
+    const resp = await fetch("/voyages/", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ nom, commentaire, date_debut, date_fin })
+    });
+    const data = await resp.json();
+    document.getElementById("voyageResult").textContent =
+        `Voyage créé : ${data.nom} (id=${data.id}) - ${data.commentaire || ""}`;
+
+    loadVoyages();
+});
+
+// 🔹 Créer un membre
+document.getElementById("membreForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nom = document.getElementById("membreNom").value;
+    const prenom = document.getElementById("membrePrenom").value;
+    const mail = document.getElementById("membreMail").value;
+    const mobile = document.getElementById("membreMobile").value;
+    const voyage_id = document.getElementById("voyageSelectMembre").value;
+
+    const resp = await fetch(`/membres/${voyage_id}/membres`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ nom, prenom, mail, mobile })
+    });
+    const data = await resp.json();
+    document.getElementById("membreResult").textContent =
+        `Membre créé : ${data.nom} ${data.prenom} (id=${data.id})`;
+});
+
+// 🔹 Ajouter une dépense
+document.getElementById("depenseForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const description = document.getElementById("depenseNom").value;
+    const montant = parseFloat(document.getElementById("depenseMontant").value);
+    const voyage_id = document.getElementById("voyageSelectDepense").value;
+
+    const resp = await fetch(`/depenses/${voyage_id}/depenses`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ description, montant })
+    });
+    const data = await resp.json();
+    document.getElementById("depenseResult").textContent =
+        `Dépense ajoutée : ${data.description} (${data.montant}€)`;
+});
+
+// 🔹 Charger les voyages pour dropdowns
+async function loadVoyages() {
+    try {
+        const res = await fetch("/voyages/derniers_voyages");
+        const data = await res.json();
+
+        const selects = [
+            document.getElementById("voyageSelectMembre"),
+            document.getElementById("voyageSelectDepense")
+        ];
+
+        if (!data.voyages || data.voyages.length === 0) {
+            selects.forEach(sel => {
+                sel.innerHTML = "";
+                const opt = document.createElement("option");
+                opt.textContent = "Aucun voyage disponible";
+                opt.disabled = true;
+                sel.appendChild(opt);
+            });
+            return;
+        }
+
+        selects.forEach(sel => {
+            sel.innerHTML = "";
+            data.voyages.forEach(v => {
+                const opt = document.createElement("option");
+                opt.value = v.id;
+                opt.textContent = v.commentaire
+                    ? `${v.nom} (${v.date_debut} → ${v.date_fin}) - ${v.commentaire}`
+                    : `${v.nom} (${v.date_debut} → ${v.date_fin})`;
+                sel.appendChild(opt);
+            });
+            if (data.voyage_defaut_id) sel.value = data.voyage_defaut_id;
+            else sel.selectedIndex = 0;
+        });
+
+    } catch (err) {
+        console.error("Erreur lors du chargement des voyages :", err);
+    }
+}
+
+// Charger voyages au démarrage
+loadVoyages();
+</script>
+
+</body>
+</html>

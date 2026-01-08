@@ -1,3 +1,4 @@
+import pandas as pd
 from datetime import date
 from sqlalchemy.orm import Session
 from app.database import SessionLocal, Base, engine
@@ -6,21 +7,19 @@ from app.models.membre import Membre
 from app.models.participation import ParticipationVoyage
 from app.models.depense import Depense
 
-# 1️⃣ Créer les tables (au cas où)
-Base.metadata.create_all(bind=engine)
 
-# 2️⃣ Ouvrir une session
+# 1️⃣ Drop complet de toutes les tables
+Base.metadata.drop_all(bind=engine)
+print("Toutes les tables ont été supprimées")
+
+# 2️⃣ Recréation des tables
+Base.metadata.create_all(bind=engine)
+print("Toutes les tables ont été recréées")
+
+# 3️⃣ Ouvrir une session
 db: Session = SessionLocal()
 
 try:
-    # --- RAZ complète des tables ---
-    # ordre important pour respecter les ForeignKey
-    db.query(Depense).delete()
-    db.query(ParticipationVoyage).delete()
-    db.query(Voyage).delete()
-    db.query(Membre).delete()
-    db.commit()
-    print("Toutes les tables ont été réinitialisées")
     # --- créer un voyage ---
     voyage = Voyage(
         nom="Séjour à Rome", date_debut=date(2026, 5, 10), date_fin=date(2026, 5, 20)
@@ -97,5 +96,72 @@ try:
         membre = db.query(Membre).get(membre_id)
         print(f"{membre.prenom} {membre.nom}: {solde:.2f} €")
 
+    def export_voyage_excel(voyage_id: int, db: Session, filename: str):
+        voyage = db.query(Voyage).get(voyage_id)
+
+        # --- Membres et participations ---
+        participants_data = []
+        for p in voyage.participations:
+            participants_data.append(
+                {
+                    "Nom": p.membre.nom,
+                    "Prénom": p.membre.prenom,
+                    "Email": p.membre.email,
+                    "Mobile": p.membre.mobile,
+                    "Date arrivée": p.date_arrivee,
+                    "Date départ": p.date_depart,
+                }
+            )
+        df_participants = pd.DataFrame(participants_data)
+
+        # --- Dépenses ---
+        depenses_data = []
+        for d in voyage.depenses:
+            depenses_data.append(
+                {
+                    "Description": d.description,
+                    "Date": d.date,
+                    "Montant": d.montant,
+                    "Payeur": d.payeur.prenom + " " + d.payeur.nom,
+                }
+            )
+        df_depenses = pd.DataFrame(depenses_data)
+
+        # --- Soldes ---
+        membres_soldes = {p.membre_id: 0.0 for p in voyage.participations}
+        for dep in voyage.depenses:
+            nb_participants = len(voyage.participations)
+            partage = dep.montant / nb_participants
+            for p in voyage.participations:
+                membres_soldes[p.membre_id] -= partage
+            membres_soldes[dep.payeur_id] += dep.montant
+
+        soldes_data = []
+        for membre_id, solde in membres_soldes.items():
+            m = db.query(Membre).get(membre_id)
+            soldes_data.append({"Nom": m.nom, "Prénom": m.prenom, "Solde": solde})
+        df_soldes = pd.DataFrame(soldes_data)
+
+        # --- Écrire dans Excel ---
+        with pd.ExcelWriter(filename) as writer:
+            df_participants.to_excel(writer, sheet_name="Participants", index=False)
+            df_depenses.to_excel(writer, sheet_name="Dépenses", index=False)
+            df_soldes.to_excel(writer, sheet_name="Soldes", index=False)
+
+        print(f"Fichier Excel généré : {filename}")
+
+    # --- Exemple d'utilisation ---
+    if __name__ == "__main__":
+        db: Session = SessionLocal()
+        export_voyage_excel(voyage_id=1, db=db, filename="voyage_rome.xlsx")
+        db.close()
+
+
 finally:
+    db.close()
+
+# --- Exemple d'utilisation ---
+if __name__ == "__main__":
+    db: Session = SessionLocal()
+    export_voyage_excel(voyage_id=1, db=db, filename="voyage_rome.xlsx")
     db.close()

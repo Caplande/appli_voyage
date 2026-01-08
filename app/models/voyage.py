@@ -10,6 +10,7 @@ class Voyage(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, nullable=False)
+    commentaire = Column(String, nullable=True)
     date_debut = Column(Date, nullable=False)
     date_fin = Column(Date, nullable=False)
 
